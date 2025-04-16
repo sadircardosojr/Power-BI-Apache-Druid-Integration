@@ -1,0 +1,69 @@
+/*
+Useful information.
+- Do not modify the script.
+- Add your query by replacing a double quote (") with two double quotes ("").
+- Use double quotes only if necessary, in database reserved words.
+*/
+
+
+let
+// ############################ Do not modify anything before this point ############################
+
+    // set your druid url here...
+    druid_url = https://<your_druid_url> // don't use / with last character.
+
+// ############################ Do not modify anything after this point ############################
+    query = Text.Replace(
+        Text.Replace(
+            Text.Replace(
+            // PASTE YOUR QUERY HERE BETWEEN THE QUOTES
+
+// ############################ Do not modify anything before this point ############################
+"
+
+ SELECT 
+ 
+    *
+ FROM 
+ 
+ ""YOUR_TABLE""
+ 
+ limit 1 
+            
+               
+"
+// ############################ Do not modify anything after this point ############################
+            , 
+"
+", " "),  // Replaces line breaks with spaces
+            """", "\"""),     // Replaces double quotes with \"
+        "#(lf)", " "),  // Replaces remaining line breaks with spaces
+    url = druid_url &"/druid/v2/sql",
+    body = Text.Format(
+        "{""query"": """ & query & """,""resultFormat"": ""object"",""header"": false,""context"":{""enableWindowing"":true,""executionMode"":""ASYNC"",""timeout"":300000,""populateCache"":true,""useCache"":true,""maxSubqueryRows"":100000000,""useApproximateCountDistinct"":false}}",
+        [query = query]
+    ),
+    headers = [
+        #"Content-Type" = "application/json"
+    ],
+    
+    // Função auxiliar para tentar a requisição com tentativas de retry e atraso entre tentativas
+    response = Json.Document(
+        Web.Contents(
+            url,
+            [
+                Headers = headers,
+                Content = Text.ToBinary(body)
+            ]
+        ),
+        65001
+    ),
+    
+    // Convertendo a resposta para tabela
+    #"Convertido para Tabela" = Table.FromList(response, Splitter.SplitByNothing(), null, null, ExtraValues.Error),
+    
+    // Expandindo as colunas dinamicamente
+    #"Colunas Expandidas" = Table.ExpandRecordColumn(#"Convertido para Tabela", "Column1", Record.FieldNames(response{0}))
+
+in
+    #"Colunas Expandidas"
